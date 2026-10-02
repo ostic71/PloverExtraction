@@ -1,0 +1,14 @@
+{
+  "llm": {
+    "model": "gpt-4.1-mini",
+    "api_base": "https://api.openai.com/v1",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 0.0,
+    "timeout_seconds": 60,
+    "max_retries": 2
+  },
+  "category": "THREATEN",
+  "event_type": "Violence",
+  "sentence_split_pattern": "(?<=[.!?])\\s+|\\n+",
+  "system_prompt": "You are a precise Plover event extraction system. Use only explicit evidence and return valid JSON."
+}
