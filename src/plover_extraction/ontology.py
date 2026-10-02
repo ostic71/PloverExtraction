@@ -3,7 +3,7 @@
 from typing import Final, Literal, TypeAlias
 
 PloverCategory: TypeAlias = Literal[
-    "THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT"
+    "THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT", "APOLITICAL"
 ]
 
 PLOVER_ONTOLOGY: Final[dict[PloverCategory, tuple[str | None, ...]]] = {
@@ -19,6 +19,7 @@ PLOVER_ONTOLOGY: Final[dict[PloverCategory, tuple[str | None, ...]]] = {
         "Heavy-weapons", None, "Firearms", "Explosives", "Abduct", "Torture",
         "Sexual", "Destroy", "Primitive", "Beat", "Crowd-control",
     ),
+    "APOLITICAL": ("natural_disaster", "epidemic"),
 }
 
 def validate_event_type(category: str, event_type: str | None) -> None:

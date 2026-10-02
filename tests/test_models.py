@@ -29,7 +29,17 @@ def test_event_type_must_belong_to_category():
         validate_event_type("ASSAULT", "Arrest")
 
 
-@pytest.mark.parametrize("field", ["doc_id", "actor_text", "recipient_text"])
+@pytest.mark.parametrize("event_type", ["natural_disaster", "epidemic"])
+def test_apolitical_event_type_is_valid(event_type):
+    validate_event_type("APOLITICAL", event_type)
+
+
+def test_apolitical_requires_a_specific_event_type():
+    with pytest.raises(ValueError, match="Invalid event_type"):
+        validate_event_type("APOLITICAL", None)
+
+
+@pytest.mark.parametrize("field", ["doc_id", "mention_id", "actor_text", "recipient_text"])
 def test_required_text_fields(field):
     values = dict(
         doc_id="doc-1", actor_text="A", recipient_text="B",
