@@ -3,9 +3,9 @@
 import json
 from string import Template
 
-from .config import PipelineConfig, selected_descriptions
+from .config import PipelineConfig
 from .llm import LLMClient
-from .models import EventMention, ExtractionRequest, Sentence
+from .models import EventMention, ExtractionRequest, ExtractionResult, Sentence
 from .sentences import split_sentences
 
 
@@ -14,25 +14,21 @@ def build_user_prompt(
 ) -> str:
     """Render the externally configured extraction prompt."""
     sentence_data = [{"id": item.sentence_id, "text": item.text} for item in sentences]
-    category_description, event_type_description = selected_descriptions(config)
     try:
         return Template(config.user_prompt_template).substitute(
             doc_id=json.dumps(request.doc_id, ensure_ascii=False),
-            category=config.category,
-            category_description=category_description,
-            event_type=json.dumps(config.event_type),
-            event_type_description=event_type_description,
+            ontology=json.dumps(config.ontology, ensure_ascii=False),
             sentences=json.dumps(sentence_data, ensure_ascii=False),
         )
     except (KeyError, ValueError) as error:
         raise ValueError(f"Invalid user_prompt_template placeholder: {error}") from error
 
 
-def extract_events(
+def extract_document(
     request: ExtractionRequest, config: PipelineConfig, client: LLMClient
-) -> list[EventMention]:
+) -> ExtractionResult:
     """Split raw text, query the LLM, and validate its output against the request."""
-    sentences = split_sentences(request.doc_id, request.raw_text, config.sentence_split_pattern)
+    sentences = split_sentences(request.raw_text, config.sentence_split_pattern)
     result = client.generate_json(
         config.system_prompt, build_user_prompt(request, config, sentences)
     )
@@ -40,12 +36,17 @@ def extract_events(
         raise ValueError("LLM output must be an object containing an events array")
     known_ids = {sentence.sentence_id for sentence in sentences}
     mentions: list[EventMention] = []
-    for index, raw in enumerate(result["events"], 1):
+    for raw in result["events"]:
         if not isinstance(raw, dict):
             raise ValueError("Each LLM event must be an object")
-        allowed = {"actor_text", "recipient_text", "evidence_sentence_ids"}
+        allowed = {
+            "doc_id", "actor_text", "recipient_text", "category", "event_type",
+            "evidence_sentence_ids",
+        }
         if set(raw) != allowed:
             raise ValueError(f"LLM event fields must be exactly: {', '.join(sorted(allowed))}")
+        if raw["doc_id"] != request.doc_id:
+            raise ValueError("LLM event doc_id must match the requested document")
         evidence_value = raw["evidence_sentence_ids"]
         if not isinstance(evidence_value, list) or not all(
             isinstance(value, str) for value in evidence_value
@@ -57,11 +58,15 @@ def extract_events(
             raise ValueError(f"LLM returned unknown sentence IDs: {', '.join(sorted(unknown))}")
         mentions.append(EventMention(
             doc_id=request.doc_id,
-            mention_id=f"m{index}",
             actor_text=raw["actor_text"],
             recipient_text=raw["recipient_text"],
-            category=config.category,
-            event_type=config.event_type,
+            category=raw["category"],
+            event_type=raw["event_type"],
             evidence_sentence_ids=evidence,
+            evidence={
+                sentence.sentence_id: sentence.text
+                for sentence in sentences
+                if sentence.sentence_id in evidence
+            },
         ))
-    return mentions
+    return ExtractionResult(request.doc_id, tuple(sentences), tuple(mentions))

@@ -8,7 +8,7 @@ from pathlib import Path
 from .config import load_config
 from .llm import OpenAICompatibleClient
 from .models import ExtractionRequest
-from .pipeline import extract_events
+from .pipeline import extract_document
 
 
 def main() -> None:
@@ -20,8 +20,8 @@ def main() -> None:
     raw_text = Path(args.input).read_text(encoding="utf-8") if args.input else sys.stdin.read()
     config = load_config(args.config)
     request = ExtractionRequest(args.doc_id, raw_text)
-    events = extract_events(request, config, OpenAICompatibleClient(config.llm))
-    json.dump([event.to_dict() for event in events], sys.stdout, ensure_ascii=False, indent=2)
+    result = extract_document(request, config, OpenAICompatibleClient(config.llm))
+    json.dump(result.to_dict(), sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
 
 

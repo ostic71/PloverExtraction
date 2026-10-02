@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .ontology import PLOVER_ONTOLOGY, PloverCategory, validate_event_type
+from .ontology import PLOVER_ONTOLOGY
 
 DEFAULT_SENTENCE_SPLIT_PATTERN = r"(?<=[.!?])\s+|\n+"
 
@@ -63,8 +63,6 @@ class LLMConfig:
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
     llm: LLMConfig
-    category: PloverCategory
-    event_type: str | None
     ontology: dict[str, Any]
     system_prompt: str
     user_prompt_template: str
@@ -81,8 +79,6 @@ def load_config(path: str | Path) -> PipelineConfig:
         )})
         config = PipelineConfig(
             llm=llm,
-            category=raw["category"],
-            event_type=raw.get("event_type"),
             ontology=json.loads(raw["ontology_json"]),
             system_prompt=raw["system_prompt"],
             user_prompt_template=raw["user_prompt_template"],
@@ -92,7 +88,6 @@ def load_config(path: str | Path) -> PipelineConfig:
         )
     except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise ValueError(f"Invalid configuration: {error}") from error
-    validate_event_type(config.category, config.event_type)
     if set(config.ontology) != set(PLOVER_ONTOLOGY):
         raise ValueError("ontology_json must define every canonical Plover category")
     for category, canonical_types in PLOVER_ONTOLOGY.items():
@@ -113,14 +108,3 @@ def load_config(path: str | Path) -> PipelineConfig:
     if config.llm.max_retries < 0 or config.llm.timeout_seconds <= 0:
         raise ValueError("LLM retries and timeout must be non-negative/positive")
     return config
-
-
-def selected_descriptions(config: PipelineConfig) -> tuple[str, str]:
-    """Return the configured category/type descriptions from the external ontology."""
-    category = config.ontology[config.category]
-    event_description = (
-        "Category-level event; apply the category definition directly."
-        if config.event_type is None
-        else category["event_types"][config.event_type]
-    )
-    return category["description"], event_description

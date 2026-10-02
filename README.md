@@ -3,12 +3,12 @@
 Pipeline trích xuất sự kiện Plover từ **raw text** bằng LLM. Package:
 
 - ontology có kiểu dữ liệu và mô tả cho category/event type;
-- kiểm tra một cặp `category`/`event_type` trước khi chạy bộ trích xuất;
+- phân loại và kiểm tra mọi cặp `category`/`event_type` do LLM trả về;
 - schema output nghiêm ngặt và tuần tự hóa JSON;
 - tự tách raw text thành các câu có ID ổn định;
 - gọi một API LLM tương thích OpenAI và xác thực mọi output;
-- đưa category, event type, model, endpoint, prompt, timeout và quy tắc tách câu
-  ra file config.
+- đưa model, endpoint, ontology, prompt, timeout và quy tắc tách câu ra file
+  config.
 
 ## Ontology
 
@@ -21,12 +21,12 @@ from plover_extraction import EventMention
 
 event = EventMention(
     doc_id="doc-1",
-    mention_id="m1",
     actor_text="Chính phủ A",
     recipient_text="B",
     category="THREATEN",
     event_type="Violence",
     evidence_sentence_ids=("s1",),
+    evidence={"s1": "Chính phủ A đe dọa B."},
 )
 
 print(event.to_dict())
@@ -50,25 +50,55 @@ plover-extract \
 ```
 
 Nếu không truyền `article.txt`, CLI đọc raw text từ stdin. Pipeline tự tách câu
-thành `s1`, `s2`, ... rồi gửi cả nội dung và ID sang LLM. `category` và
-`event_type` được load từ config; LLM chỉ tìm actor, recipient và bằng chứng
-phù hợp với cặp nhãn đó. Pipeline tự tạo `m1`, `m2`, ... và không tin các ID do
-LLM tự sinh. Module không đọc CSV hoặc Markdown.
+thành `s1`, `s2`, ... rồi gửi cả nội dung, ID và toàn bộ ontology sang LLM. LLM
+tìm và phân loại mọi sự kiện được hỗ trợ trong một lần gọi. Pipeline kiểm tra cặp
+nhãn, trả lại các câu đã tách và nội dung evidence tương ứng. Module không đọc CSV
+hoặc Markdown.
 
-Output:
+## Chạy tự động với CSV hoặc raw text
+
+Script `extract.py` nhận một file CSV, file text, raw text truyền trực tiếp hoặc
+stdin. Nếu input không có document ID, script tự sinh UUID. Với CSV, cột nội
+dung có thể là `raw_text` hoặc `raw_article`; ID được lấy lần lượt từ `doc_id`
+hoặc `article_id`.
+
+```bash
+# CSV nhiều dòng
+python extract.py data/2025T8_article.csv --output output.json
+
+# Raw text truyền trực tiếp
+python extract.py --text "Russia launched drones at Kiev." --doc-id doc-1
+
+# File text; tự sinh UUID vì không truyền --doc-id
+python extract.py article.txt
+
+# stdin; tự sinh UUID
+echo "Russia launched drones at Kiev." | python extract.py
+```
+
+Mặc định script dùng `config.example.yaml`; truyền `--config path/to/config.yaml`
+để chọn config khác. Output giữ kết quả theo từng document dưới dạng
+`[{"doc_id": "...", "sentences": {...}, "events": [...]}]`, kể cả khi document
+không có event.
+
+## Output của CLI `plover-extract`
+
+CLI gốc xử lý một document và trả object gồm các câu đã tách cùng danh sách event:
 
 ```json
-[
-  {
+{
+  "doc_id": "doc-1",
+  "sentences": {"s1": "Chính phủ A đe dọa B."},
+  "events": [{
     "doc_id": "doc-1",
-    "mention_id": "m1",
     "actor_text": "Chính phủ A",
     "recipient_text": "B",
     "category": "THREATEN",
     "event_type": "Violence",
-    "evidence_sentence_ids": ["s1"]
-  }
-]
+    "evidence_sentence_ids": ["s1"],
+    "evidence": {"s1": "Chính phủ A đe dọa B."}
+  }]
+}
 ```
 
 ## Cấu hình
@@ -79,13 +109,11 @@ Output:
 - `llm.api_base`: endpoint tương thích OpenAI;
 - `llm.api_key_env`: tên biến môi trường chứa API key;
 - `llm.temperature`, `llm.timeout_seconds`, `llm.max_retries`;
-- `category`, `event_type`: cặp nhãn Plover mục tiêu;
 - `ontology_json`: đầy đủ cả năm category, danh sách event type và mô tả của
-  từng category/event type; pipeline tự chọn định nghĩa theo cặp nhãn mục tiêu;
+  từng category/event type;
 - `sentence_split_pattern`: regular expression tách raw text thành câu;
 - `system_prompt`, `user_prompt_template`: toàn bộ chỉ dẫn cho LLM. Template hỗ
-  trợ các placeholder `$doc_id`, `$category`, `$category_description`,
-  `$event_type`, `$event_type_description` và `$sentences`.
+  trợ các placeholder `$doc_id`, `$ontology` và `$sentences`.
 
 LLM bắt buộc trả về một JSON object dạng:
 
@@ -93,14 +121,18 @@ LLM bắt buộc trả về một JSON object dạng:
 {
   "events": [
     {
+      "doc_id": "doc-1",
       "actor_text": "Chính phủ A",
       "recipient_text": "B",
+      "category": "THREATEN",
+      "event_type": "Violence",
       "evidence_sentence_ids": ["s1"]
     }
   ]
 }
 ```
 
-Pipeline từ chối field thừa, evidence ID không tồn tại, output không phải JSON
-hoặc actor/recipient rỗng. Nếu không có event phù hợp, LLM phải trả
-`{"events": []}`.
+LLM không trả nội dung `evidence`; pipeline dùng `evidence_sentence_ids` để thêm
+nội dung câu ở bước post-processing, giúp giảm output token. Pipeline từ chối
+field thừa, `doc_id` sai, evidence ID không tồn tại, output không phải JSON hoặc
+actor/recipient rỗng. Nếu không có event phù hợp, LLM phải trả `{"events": []}`.
