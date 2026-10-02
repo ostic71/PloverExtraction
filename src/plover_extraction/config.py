@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .ontology import PloverCategory, validate_event_type
+from .ontology import PLOVER_ONTOLOGY, PloverCategory, validate_event_type
 
 DEFAULT_SENTENCE_SPLIT_PATTERN = r"(?<=[.!?])\s+|\n+"
 
@@ -65,9 +65,7 @@ class PipelineConfig:
     llm: LLMConfig
     category: PloverCategory
     event_type: str | None
-    allowed_event_types: tuple[str | None, ...]
-    category_description: str
-    event_type_description: str
+    ontology: dict[str, Any]
     system_prompt: str
     user_prompt_template: str
     sentence_split_pattern: str = DEFAULT_SENTENCE_SPLIT_PATTERN
@@ -85,23 +83,44 @@ def load_config(path: str | Path) -> PipelineConfig:
             llm=llm,
             category=raw["category"],
             event_type=raw.get("event_type"),
-            allowed_event_types=tuple(raw["allowed_event_types"]),
-            category_description=raw["category_description"],
-            event_type_description=raw["event_type_description"],
+            ontology=json.loads(raw["ontology_json"]),
             system_prompt=raw["system_prompt"],
             user_prompt_template=raw["user_prompt_template"],
             sentence_split_pattern=raw.get(
                 "sentence_split_pattern", DEFAULT_SENTENCE_SPLIT_PATTERN
             ),
         )
-    except (KeyError, TypeError) as error:
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise ValueError(f"Invalid configuration: {error}") from error
     validate_event_type(config.category, config.event_type)
-    if config.event_type not in config.allowed_event_types:
-        raise ValueError("event_type must be included in allowed_event_types")
-    for name in ("model", "category_description", "event_type_description", "system_prompt", "user_prompt_template"):
+    if set(config.ontology) != set(PLOVER_ONTOLOGY):
+        raise ValueError("ontology_json must define every canonical Plover category")
+    for category, canonical_types in PLOVER_ONTOLOGY.items():
+        item = config.ontology[category]
+        if not isinstance(item, dict) or not str(item.get("description", "")).strip():
+            raise ValueError(f"Missing description for category {category}")
+        event_types = item.get("event_types")
+        expected = {value for value in canonical_types if value is not None}
+        if not isinstance(event_types, dict) or set(event_types) != expected:
+            raise ValueError(f"event_types for {category} do not match canonical ontology")
+        if not all(isinstance(value, str) and value.strip() for value in event_types.values()):
+            raise ValueError(f"Every event_type in {category} must have a description")
+        if item.get("allow_category_only") is not (None in canonical_types):
+            raise ValueError(f"Invalid allow_category_only for {category}")
+    for name in ("model", "system_prompt", "user_prompt_template"):
         if not getattr(config.llm, name, None) and not getattr(config, name, None):
             raise ValueError(f"{name} must be a non-empty string")
     if config.llm.max_retries < 0 or config.llm.timeout_seconds <= 0:
         raise ValueError("LLM retries and timeout must be non-negative/positive")
     return config
+
+
+def selected_descriptions(config: PipelineConfig) -> tuple[str, str]:
+    """Return the configured category/type descriptions from the external ontology."""
+    category = config.ontology[config.category]
+    event_description = (
+        "Category-level event; apply the category definition directly."
+        if config.event_type is None
+        else category["event_types"][config.event_type]
+    )
+    return category["description"], event_description

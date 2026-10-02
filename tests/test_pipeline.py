@@ -4,6 +4,7 @@ import pytest
 
 from plover_extraction.config import load_config
 from plover_extraction.models import ExtractionRequest
+from plover_extraction.ontology import PLOVER_ONTOLOGY
 from plover_extraction.pipeline import extract_events
 from plover_extraction.sentences import split_sentences
 
@@ -68,28 +69,23 @@ def test_llm_cannot_add_unexpected_fields():
 
 def test_config_is_loaded_from_yaml(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text("""\
-model: custom-model
-api_base: https://example.test/v1
-api_key_env: TEST_KEY
-temperature: 0.2
-timeout_seconds: 10
-max_retries: 1
-category: COERCE
-event_type: Arrest
-allowed_event_types: [null, "Arrest"]
-category_description: Coercion definition
-event_type_description: Arrest definition
-system_prompt: Custom prompt
-user_prompt_template: "Extract $category from $sentences"
-sentence_split_pattern: "\\\\n+"
-""", encoding="utf-8")
+    text = (Path(__file__).parents[1] / "config.example.yaml").read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("model: gpt-4.1-mini", "model: custom-model")
+        .replace("temperature: 0.0", "temperature: 0.2")
+        .replace("category: THREATEN", "category: COERCE")
+        .replace("event_type: Violence", "event_type: Arrest")
+        .replace('sentence_split_pattern: "(?<=[.!?])\\\\s+|\\\\n+"', 'sentence_split_pattern: "\\\\n+"'),
+        encoding="utf-8",
+    )
     loaded = load_config(path)
     assert loaded.llm.model == "custom-model"
     assert loaded.llm.temperature == 0.2
     assert loaded.category == "COERCE"
     assert loaded.event_type == "Arrest"
     assert loaded.sentence_split_pattern == "\\n+"
+    assert set(loaded.ontology) == {"THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT"}
+    assert "Arrest" in loaded.ontology["COERCE"]["event_types"]
 
 
 def test_sentence_split_pattern_is_configurable():
@@ -116,3 +112,14 @@ def test_config_rejects_mismatched_category_and_event_type(tmp_path):
     path.write_text(text.replace("category: THREATEN", "category: ASSAULT"), encoding="utf-8")
     with pytest.raises(ValueError, match="Invalid event_type"):
         load_config(path)
+
+
+def test_example_config_describes_every_category_and_event_type():
+    loaded = config()
+    assert set(loaded.ontology) == set(PLOVER_ONTOLOGY)
+    for category, canonical_types in PLOVER_ONTOLOGY.items():
+        configured = loaded.ontology[category]
+        expected = {value for value in canonical_types if value is not None}
+        assert set(configured["event_types"]) == expected
+        assert configured["description"].strip()
+        assert all(description.strip() for description in configured["event_types"].values())

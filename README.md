@@ -79,9 +79,9 @@ Output:
 - `llm.api_base`: endpoint tương thích OpenAI;
 - `llm.api_key_env`: tên biến môi trường chứa API key;
 - `llm.temperature`, `llm.timeout_seconds`, `llm.max_retries`;
-- `category`, `event_type`, `allowed_event_types`: cặp nhãn Plover mục tiêu và
-  các event type được phép;
-- `category_description`, `event_type_description`: định nghĩa được đưa vào LLM;
+- `category`, `event_type`: cặp nhãn Plover mục tiêu;
+- `ontology_json`: đầy đủ cả năm category, danh sách event type và mô tả của
+  từng category/event type; pipeline tự chọn định nghĩa theo cặp nhãn mục tiêu;
 - `sentence_split_pattern`: regular expression tách raw text thành câu;
 - `system_prompt`, `user_prompt_template`: toàn bộ chỉ dẫn cho LLM. Template hỗ
   trợ các placeholder `$doc_id`, `$category`, `$category_description`,

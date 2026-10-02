@@ -3,7 +3,7 @@
 import json
 from string import Template
 
-from .config import PipelineConfig
+from .config import PipelineConfig, selected_descriptions
 from .llm import LLMClient
 from .models import EventMention, ExtractionRequest, Sentence
 from .sentences import split_sentences
@@ -14,13 +14,14 @@ def build_user_prompt(
 ) -> str:
     """Render the externally configured extraction prompt."""
     sentence_data = [{"id": item.sentence_id, "text": item.text} for item in sentences]
+    category_description, event_type_description = selected_descriptions(config)
     try:
         return Template(config.user_prompt_template).substitute(
             doc_id=json.dumps(request.doc_id, ensure_ascii=False),
             category=config.category,
-            category_description=config.category_description,
+            category_description=category_description,
             event_type=json.dumps(config.event_type),
-            event_type_description=config.event_type_description,
+            event_type_description=event_type_description,
             sentences=json.dumps(sentence_data, ensure_ascii=False),
         )
     except (KeyError, ValueError) as error:
