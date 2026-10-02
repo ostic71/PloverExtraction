@@ -1,0 +1,118 @@
+# Runtime and complete Plover ontology configuration.
+model: gpt-4.1-mini
+api_base: https://api.openai.com/v1
+api_key_env: OPENAI_API_KEY
+temperature: 0.0
+timeout_seconds: 60
+max_retries: 2
+
+category: THREATEN
+event_type: Violence
+ontology_json: |
+  {
+    "THREATEN": {
+      "description": "Communicate an adverse consequence directed at a target, conditionally or unconditionally, to intimidate or compel. The communication has occurred; the threatened action need not occur. A demand without an adverse consequence, hostile commentary, risk forecast, or announcement of military plans alone is insufficient.",
+      "allow_category_only": true,
+      "event_types": {
+        "Territory": "Threaten occupation or seizure of control over all or part of a territory.",
+        "Arrest": "Threaten arrest, detention, or imprisonment; includes an in-absentia arrest not physically enforced.",
+        "Relations": "Threaten to suspend relations or ongoing talks, meetings, or negotiations.",
+        "Expel": "Threaten expulsion of diplomats, peacekeepers, or NGOs.",
+        "Violence": "Threaten physical violence; hostile language alone is insufficient.",
+        "Restrict": "Threaten restrictions on movement of people or goods, including boycotts, strikes, blockades, curfews, economic sanctions, tariffs, trade embargoes, or bans on political activity."
+      }
+    },
+    "PROTEST": {
+      "description": "Carry out public or collective dissent through demonstrations, strikes, hunger strikes, boycotts, obstruction, or riots. A hunger strike may involve one person. Violence integral to a riot remains PROTEST; do not duplicate that same act as ASSAULT. Separately evaluate police violence or arrests. Hunger caused by food deprivation is not a hunger strike.",
+      "allow_category_only": true,
+      "event_types": {
+        "Riot": "Violent collective protest whose participants intend physical injury or property damage.",
+        "Demo": "An organized, continuous, largely peaceful public demonstration or rally against an actor or policy.",
+        "Strike": "Collective withdrawal of labor or abandonment of workplaces as protest.",
+        "Hunger": "Refusal of food as protest; involuntary hunger is insufficient.",
+        "Boycott": "Protest through withdrawal of commercial or social relations with an activity, person, country, or organization.",
+        "Obstruct": "Protest by physically obstructing passage or access to a location."
+      }
+    },
+    "MOBILIZE": {
+      "description": "Actually deploy, reinforce, mobilize, or increase readiness of military, police, armed groups, or military hardware, including exercises already underway. Training fire or simulated attacks are not ASSAULT. A planned exercise, equipment inventory, or existing deployment alone does not establish a new mobilization; actual attacks on real opponents belong to ASSAULT.",
+      "allow_category_only": true,
+      "event_types": {
+        "Troops": "Mobilize armed personnel or military units without actual combat; distinguish police and non-state militias.",
+        "Weapons": "Mobilize or increase readiness of weapon systems, military ships, aircraft, or vehicles.",
+        "Militia": "Mobilize or increase readiness of a non-state entity with significant military capability.",
+        "Police": "Mobilize or increase readiness of police or security units."
+      }
+    },
+    "COERCE": {
+      "description": "Implement coercive control through arrest, detention, seizure, deportation, restrictions, censorship, cyber intrusion, or withholding essentials, below substantial physical violence. An expressly imposed emergency or effective curfew qualifies. An arrest warrant or order alone does not establish an arrest. Beating, torture, kidnapping, hostage-taking, and combat capture belong to ASSAULT.",
+      "allow_category_only": true,
+      "event_types": {
+        "Martial-law": "Impose a state-of-emergency or martial-law regime.",
+        "Seize": "Execute a search or raid, or confiscate property.",
+        "Restrict": "Impose restrictions on political freedoms or movement.",
+        "Arrest": "Arrest, detain, or imprison; excludes combat capture and in-absentia arrest.",
+        "Deport": "Expel or deport individuals from a territory.",
+        "Withhold": "Withhold public goods or essential physical services.",
+        "Cyber": "Conduct a cyberattack or cybercrime.",
+        "Censor": "Censor, ban, or restrict access to publications or information.",
+        "Curfew": "Impose or enforce a curfew.",
+        "Misinformation": "Conduct a specific deception, manipulation, or misinformation operation."
+      }
+    },
+    "ASSAULT": {
+      "description": "Carry out or physically attempt deliberate violence against people or property: shooting, bombing, shelling, beating, torture, sexual violence, abduction, hostage-taking, or combat capture. Police perpetrators do not make violence COERCE. Distinguish custodial arrest, training simulations, and violence integral to a PROTEST riot. Existing territorial control alone does not establish a new attack.",
+      "allow_category_only": true,
+      "event_types": {
+        "Unconventional": "Use chemical, biological, radiological, or nuclear weapons.",
+        "Targeted": "Attempt or carry out assassination, execution, or deliberate mass killing of defenseless people.",
+        "Suicide-attack": "An individual or vehicle attack explicitly involving the attacker's suicide.",
+        "Aerial": "Attack using manned aircraft or helicopters.",
+        "Drone": "Attack using unmanned aerial vehicles or drones.",
+        "Heavy-weapons": "Attack using artillery, rocket launchers, armored vehicles, tanks, or comparable heavy weapons.",
+        "Firearms": "Attack using rifles, pistols, light machine guns, or comparable small arms.",
+        "Explosives": "Use explosives outside heavy weapons, including mines, IEDs, and car bombs.",
+        "Abduct": "Abduct, kidnap, hijack, or capture enemy combatants during armed conflict.",
+        "Torture": "Inflict torture; do not infer it from detention or injury alone.",
+        "Sexual": "Commit rape or other sexual violence.",
+        "Destroy": "Intentionally destroy property; also applies when the attack method is unknown.",
+        "Primitive": "Attack using fire, edged weapons, rocks, farm implements, or blunt instruments.",
+        "Beat": "Bodily assault by one-off or repeated blows.",
+        "Crowd-control": "Use explicit less-lethal crowd-control weapons or tactics."
+      }
+    }
+  }
+
+sentence_split_pattern: "(?<=[.!?])\\s+|\\n+"
+system_prompt: |
+  You are a precise Plover event extraction system. Use only explicit evidence
+  and return valid JSON.
+user_prompt_template: |
+  TASK
+  Find every distinct event in SENTENCES that satisfies both TARGET_CATEGORY and
+  TARGET_EVENT_TYPE. Use the definitions below, not keyword matching alone.
+
+  EXTRACTION RULES
+  1. actor_text is the exact text span for the entity performing or communicating
+  the event. recipient_text is the exact text span for its target.
+  2. Copy actor_text and recipient_text verbatim from SENTENCES; never infer an
+  unstated entity. If either role is not explicit, do not emit that event.
+  3. evidence_sentence_ids contains every and only sentence needed to establish
+  the actor, recipient, and event. Use only IDs present in SENTENCES.
+  4. Emit separate array items for distinct event mentions. Do not duplicate one
+  event merely because it has multiple evidence sentences.
+  5. Ignore events belonging to another Plover category/type. Return an empty
+  events array when no matching event is explicit.
+
+  OUTPUT CONTRACT
+  Return JSON only, with exactly this shape (no markdown or extra keys):
+  {"events":[{"actor_text":"exact source span","recipient_text":"exact source span","evidence_sentence_ids":["s1"]}]}
+  The pipeline adds fixed fields to produce this public item schema:
+  {"doc_id":"document id","mention_id":"m1","actor_text":"exact source span","recipient_text":"exact source span","category":"configured category","event_type":"configured event type or null","evidence_sentence_ids":["s1"]}
+
+  DOCUMENT_ID: $doc_id
+  TARGET_CATEGORY: $category
+  CATEGORY_DEFINITION: $category_description
+  TARGET_EVENT_TYPE: $event_type
+  EVENT_TYPE_DEFINITION: $event_type_description
+  SENTENCES: $sentences
