@@ -6,8 +6,6 @@ temperature: 0.0
 timeout_seconds: 60
 max_retries: 2
 
-category: THREATEN
-event_type: Violence
 ontology_json: |
   {
     "THREATEN": {
@@ -97,8 +95,8 @@ system_prompt: |
   and return valid JSON.
 user_prompt_template: |
   TASK
-  Find every distinct event in SENTENCES that satisfies both TARGET_CATEGORY and
-  TARGET_EVENT_TYPE. Use the definitions below, not keyword matching alone.
+  Find every distinct Plover event in SENTENCES. Classify each event using
+  ONTOLOGY and its definitions, not keyword matching alone.
 
   EXTRACTION RULES
   1. actor_text is the exact text span for the entity performing or communicating
@@ -109,18 +107,16 @@ user_prompt_template: |
   the actor, recipient, and event. Use only IDs present in SENTENCES.
   4. Emit separate array items for distinct event mentions. Do not duplicate one
   event merely because it has multiple evidence sentences.
-  5. Ignore events belonging to another Plover category/type. Return an empty
-  events array when no matching event is explicit.
+  5. category must be an ONTOLOGY category. event_type must belong to that
+  category, or be null when only the category can be determined. Return an empty
+  events array when no supported event is explicit.
 
   OUTPUT CONTRACT
   Return JSON only, with exactly this shape (no markdown or extra keys):
-  {"events":[{"actor_text":"exact source span","recipient_text":"exact source span","evidence_sentence_ids":["s1"]}]}
+  {"events":[{"actor_text":"exact source span","recipient_text":"exact source span","category":"ASSAULT","event_type":"Drone","evidence_sentence_ids":["s1"]}]}
   The pipeline adds fixed fields to produce this public item schema:
-  {"doc_id":"document id","mention_id":"m1","actor_text":"exact source span","recipient_text":"exact source span","category":"configured category","event_type":"configured event type or null","evidence_sentence_ids":["s1"]}
+  {"doc_id":"document id","mention_id":"m1","actor_text":"exact source span","recipient_text":"exact source span","category":"validated category","event_type":"validated event type or null","evidence_sentence_ids":["s1"]}
 
   DOCUMENT_ID: $doc_id
-  TARGET_CATEGORY: $category
-  CATEGORY_DEFINITION: $category_description
-  TARGET_EVENT_TYPE: $event_type
-  EVENT_TYPE_DEFINITION: $event_type_description
+  ONTOLOGY: $ontology
   SENTENCES: $sentences

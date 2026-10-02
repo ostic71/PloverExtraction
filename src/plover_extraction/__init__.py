@@ -1,6 +1,6 @@
 """Public API for Plover extraction schemas."""
 
-from .models import EventMention, ExtractionRequest, Sentence
+from .models import EventMention, ExtractionRequest
 from .ontology import (
     PLOVER_ONTOLOGY,
     PloverCategory,
@@ -12,6 +12,5 @@ __all__ = [
     "ExtractionRequest",
     "PLOVER_ONTOLOGY",
     "PloverCategory",
-    "Sentence",
     "validate_event_type",
 ]
