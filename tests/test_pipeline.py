@@ -83,7 +83,9 @@ def test_config_is_loaded_from_yaml(tmp_path):
     assert loaded.llm.model == "custom-model"
     assert loaded.llm.temperature == 0.2
     assert loaded.sentence_split_pattern == "\\n+"
-    assert set(loaded.ontology) == {"THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT"}
+    assert set(loaded.ontology) == {
+        "THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT", "APOLITICAL"
+    }
     assert "Arrest" in loaded.ontology["COERCE"]["event_types"]
 
 
@@ -122,3 +124,18 @@ def test_example_config_describes_every_category_and_event_type():
         assert set(configured["event_types"]) == expected
         assert configured["description"].strip()
         assert all(description.strip() for description in configured["event_types"].values())
+
+
+@pytest.mark.parametrize("event_type", ["natural_disaster", "epidemic"])
+def test_apolitical_event_types_are_available_in_config(tmp_path, event_type):
+    path = tmp_path / "config.yaml"
+    text = (Path(__file__).parents[1] / "config.example.yaml").read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("category: THREATEN", "category: APOLITICAL")
+        .replace("event_type: Violence", f"event_type: {event_type}"),
+        encoding="utf-8",
+    )
+    loaded = load_config(path)
+    assert loaded.category == "APOLITICAL"
+    assert loaded.event_type == event_type
+    assert loaded.ontology["APOLITICAL"]["event_types"][event_type].strip()

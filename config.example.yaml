@@ -78,6 +78,14 @@ ontology_json: |
         "Beat": "Bodily assault by one-off or repeated blows.",
         "Crowd-control": "Use explicit less-lethal crowd-control weapons or tactics."
       }
+    },
+    "APOLITICAL": {
+      "description": "A non-political event caused by a natural hazard or the spread of disease. Do not use this category for political responses to, exploitation of, or disputes about the event.",
+      "allow_category_only": false,
+      "event_types": {
+        "natural_disaster": "A naturally caused hazardous event, such as an earthquake, flood, storm, wildfire, landslide, drought, volcanic eruption, or tsunami, that harms or threatens people, property, or the environment.",
+        "epidemic": "An outbreak or unusually widespread occurrence of an infectious disease affecting a community, region, or population."
+      }
     }
   }
 
