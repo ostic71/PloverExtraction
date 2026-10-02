@@ -12,9 +12,12 @@ Pipeline trích xuất sự kiện Plover từ **raw text** bằng LLM. Package:
 
 ## Ontology
 
-Các category hợp lệ là `THREATEN`, `PROTEST`, `MOBILIZE`, `COERCE` và
-`ASSAULT`. `event_type` phải thuộc category tương ứng. Giá trị `null` được hỗ
-trợ cho sự kiện chỉ xác định được category.
+Các category hợp lệ là `THREATEN`, `PROTEST`, `MOBILIZE`, `COERCE`,
+`ASSAULT` và `APOLITICAL`. Category `APOLITICAL` có hai mode (biểu diễn trong
+schema bằng `event_type`) là `natural_disaster` và `epidemic`. `event_type`
+phải thuộc category tương ứng. Giá trị `null` được hỗ trợ cho các
+category cho phép sự kiện chỉ xác định được category; `APOLITICAL` yêu cầu
+một trong hai mode cụ thể.
 
 ```python
 from plover_extraction import EventMention
@@ -80,7 +83,7 @@ Output:
 - `llm.api_key_env`: tên biến môi trường chứa API key;
 - `llm.temperature`, `llm.timeout_seconds`, `llm.max_retries`;
 - `category`, `event_type`: cặp nhãn Plover mục tiêu;
-- `ontology_json`: đầy đủ cả năm category, danh sách event type và mô tả của
+- `ontology_json`: đầy đủ cả sáu category, danh sách event type và mô tả của
   từng category/event type; pipeline tự chọn định nghĩa theo cặp nhãn mục tiêu;
 - `sentence_split_pattern`: regular expression tách raw text thành câu;
 - `system_prompt`, `user_prompt_template`: toàn bộ chỉ dẫn cho LLM. Template hỗ
