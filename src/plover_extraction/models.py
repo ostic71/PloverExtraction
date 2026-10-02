@@ -14,19 +14,17 @@ def _required(value: str, field: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class Sentence:
-    doc_id: str
     sentence_id: str
     text: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "doc_id", _required(self.doc_id, "doc_id"))
         object.__setattr__(self, "sentence_id", _required(self.sentence_id, "sentence_id"))
         object.__setattr__(self, "text", _required(self.text, "text"))
 
 
 @dataclass(frozen=True, slots=True)
 class ExtractionRequest:
-    """A raw document to extract with labels supplied by pipeline config."""
+    """A raw document from which to extract all supported event labels."""
 
     doc_id: str
     raw_text: str

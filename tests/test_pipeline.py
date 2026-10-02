@@ -27,6 +27,8 @@ def test_raw_text_is_split_and_llm_output_is_normalized():
     client = FakeClient({"events": [{
         "actor_text": "Chính phủ A",
         "recipient_text": "B",
+        "category": "THREATEN",
+        "event_type": "Violence",
         "evidence_sentence_ids": ["s1", "s2"],
     }]})
     request = ExtractionRequest("doc-1", "A đe dọa B. B đã phản đối.")
@@ -46,7 +48,8 @@ def test_empty_event_list_is_supported():
 
 def test_unknown_evidence_id_is_rejected():
     response = {"events": [{
-        "actor_text": "A", "recipient_text": "B", "evidence_sentence_ids": ["s9"]
+        "actor_text": "A", "recipient_text": "B", "category": "THREATEN",
+        "event_type": "Violence", "evidence_sentence_ids": ["s9"]
     }]}
     with pytest.raises(ValueError, match="unknown sentence IDs"):
         extract_events(
@@ -58,7 +61,7 @@ def test_unknown_evidence_id_is_rejected():
 def test_llm_cannot_add_unexpected_fields():
     response = {"events": [{
         "actor_text": "A", "recipient_text": "B", "evidence_sentence_ids": ["s1"],
-        "category": "PROTEST",
+        "category": "THREATEN", "event_type": "Violence", "extra": True,
     }]}
     with pytest.raises(ValueError, match="fields must be exactly"):
         extract_events(
@@ -73,23 +76,19 @@ def test_config_is_loaded_from_yaml(tmp_path):
     path.write_text(
         text.replace("model: gpt-4.1-mini", "model: custom-model")
         .replace("temperature: 0.0", "temperature: 0.2")
-        .replace("category: THREATEN", "category: COERCE")
-        .replace("event_type: Violence", "event_type: Arrest")
         .replace('sentence_split_pattern: "(?<=[.!?])\\\\s+|\\\\n+"', 'sentence_split_pattern: "\\\\n+"'),
         encoding="utf-8",
     )
     loaded = load_config(path)
     assert loaded.llm.model == "custom-model"
     assert loaded.llm.temperature == 0.2
-    assert loaded.category == "COERCE"
-    assert loaded.event_type == "Arrest"
     assert loaded.sentence_split_pattern == "\\n+"
     assert set(loaded.ontology) == {"THREATEN", "PROTEST", "MOBILIZE", "COERCE", "ASSAULT"}
     assert "Arrest" in loaded.ontology["COERCE"]["event_types"]
 
 
 def test_sentence_split_pattern_is_configurable():
-    sentences = split_sentences("d", "One|Two|Three", r"\|")
+    sentences = split_sentences("One|Two|Three", r"\|")
     assert [sentence.sentence_id for sentence in sentences] == ["s1", "s2", "s3"]
 
 
@@ -100,18 +99,18 @@ def test_prompt_contains_schema_and_extraction_rules():
     assert "actor_text" in client.user_prompt
     assert "recipient_text" in client.user_prompt
     assert "evidence_sentence_ids" in client.user_prompt
-    assert '"mention_id":"m1"' in client.user_prompt
-    assert '"category":"configured category"' in client.user_prompt
-    assert "TARGET_CATEGORY: THREATEN" in client.user_prompt
-    assert "TARGET_EVENT_TYPE: \"Violence\"" in client.user_prompt
+    assert '"category":"ASSAULT"' in client.user_prompt
+    assert '"THREATEN"' in client.user_prompt
+    assert '"PROTEST"' in client.user_prompt
 
 
-def test_config_rejects_mismatched_category_and_event_type(tmp_path):
-    path = tmp_path / "config.yaml"
-    text = (Path(__file__).parents[1] / "config.example.yaml").read_text(encoding="utf-8")
-    path.write_text(text.replace("category: THREATEN", "category: ASSAULT"), encoding="utf-8")
+def test_pipeline_rejects_mismatched_category_and_event_type():
+    response = {"events": [{
+        "actor_text": "A", "recipient_text": "B", "category": "ASSAULT",
+        "event_type": "Arrest", "evidence_sentence_ids": ["s1"],
+    }]}
     with pytest.raises(ValueError, match="Invalid event_type"):
-        load_config(path)
+        extract_events(ExtractionRequest("d", "A arrested B."), config(), FakeClient(response))
 
 
 def test_example_config_describes_every_category_and_event_type():

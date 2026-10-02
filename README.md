@@ -3,12 +3,12 @@
 Pipeline trích xuất sự kiện Plover từ **raw text** bằng LLM. Package:
 
 - ontology có kiểu dữ liệu và mô tả cho category/event type;
-- kiểm tra một cặp `category`/`event_type` trước khi chạy bộ trích xuất;
+- phân loại và kiểm tra mọi cặp `category`/`event_type` do LLM trả về;
 - schema output nghiêm ngặt và tuần tự hóa JSON;
 - tự tách raw text thành các câu có ID ổn định;
 - gọi một API LLM tương thích OpenAI và xác thực mọi output;
-- đưa category, event type, model, endpoint, prompt, timeout và quy tắc tách câu
-  ra file config.
+- đưa model, endpoint, ontology, prompt, timeout và quy tắc tách câu ra file
+  config.
 
 ## Ontology
 
@@ -50,10 +50,10 @@ plover-extract \
 ```
 
 Nếu không truyền `article.txt`, CLI đọc raw text từ stdin. Pipeline tự tách câu
-thành `s1`, `s2`, ... rồi gửi cả nội dung và ID sang LLM. `category` và
-`event_type` được load từ config; LLM chỉ tìm actor, recipient và bằng chứng
-phù hợp với cặp nhãn đó. Pipeline tự tạo `m1`, `m2`, ... và không tin các ID do
-LLM tự sinh. Module không đọc CSV hoặc Markdown.
+thành `s1`, `s2`, ... rồi gửi cả nội dung, ID và toàn bộ ontology sang LLM. LLM
+tìm và phân loại mọi sự kiện được hỗ trợ trong một lần gọi. Pipeline kiểm tra cặp
+nhãn, tự tạo `m1`, `m2`, ... và không tin các ID do LLM tự sinh. Module không đọc
+CSV hoặc Markdown.
 
 Output:
 
@@ -79,13 +79,11 @@ Output:
 - `llm.api_base`: endpoint tương thích OpenAI;
 - `llm.api_key_env`: tên biến môi trường chứa API key;
 - `llm.temperature`, `llm.timeout_seconds`, `llm.max_retries`;
-- `category`, `event_type`: cặp nhãn Plover mục tiêu;
 - `ontology_json`: đầy đủ cả năm category, danh sách event type và mô tả của
-  từng category/event type; pipeline tự chọn định nghĩa theo cặp nhãn mục tiêu;
+  từng category/event type;
 - `sentence_split_pattern`: regular expression tách raw text thành câu;
 - `system_prompt`, `user_prompt_template`: toàn bộ chỉ dẫn cho LLM. Template hỗ
-  trợ các placeholder `$doc_id`, `$category`, `$category_description`,
-  `$event_type`, `$event_type_description` và `$sentences`.
+  trợ các placeholder `$doc_id`, `$ontology` và `$sentences`.
 
 LLM bắt buộc trả về một JSON object dạng:
 
@@ -95,6 +93,8 @@ LLM bắt buộc trả về một JSON object dạng:
     {
       "actor_text": "Chính phủ A",
       "recipient_text": "B",
+      "category": "THREATEN",
+      "event_type": "Violence",
       "evidence_sentence_ids": ["s1"]
     }
   ]
